@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prototype 3D – Tumbler &amp; Lunchbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f3ea;--card:#fffdf7;--ink:#3a2b20;--mute:#7b6c5e;--line:#e4dccb;--accent:#70604f;--stage:#ece6d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1814;--card:#28211b;--ink:#f1e9da;--mute:#b3a592;--line:#3d342b;--accent:#d3c4a8;--stage:#322a22;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1d1814;--card:#28211b;--ink:#f1e9da;--mute:#b3a592;--line:#3d342b;--accent:#d3c4a8;--stage:#322a22;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"DM Sans",system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:18px 28px;max-width:1200px;margin:auto}
+.logo{font-family:Fraunces,Georgia,serif;font-size:22px;font-style:italic}
+nav span{font-size:14px;color:var(--mute);margin-left:22px}
+main{max-width:1200px;margin:auto;padding:8px 20px 40px;display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.stage{position:relative;background:var(--stage);border-radius:24px;min-height:520px;overflow:hidden;touch-action:none;cursor:grab}
+.stage:active{cursor:grabbing}
+canvas{display:block;width:100%;height:100%;position:absolute;inset:0}
+.hint{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:12px;color:var(--mute);pointer-events:none}
+.tag{position:absolute;top:16px;left:18px;font-family:Fraunces,Georgia,serif;font-size:15px;color:var(--mute)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:30px;margin:0 0 4px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 18px}
+.tabs{display:flex;gap:8px;margin-bottom:18px}
+.tab,.chip,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:9px 16px;font-size:14px}
+.tab.on,.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:18px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:7px 14px;font-size:13px}
+.sw{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.sw button{aspect-ratio:1;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;transition:transform .15s}
+.sw button:hover{transform:scale(1.1)}
+.sw button.on{outline:2px solid var(--ink);outline-offset:2px}
+.nm{font-size:13px;color:var(--mute);margin-top:8px;min-height:18px}
+.sum{display:flex;flex-direction:column;gap:6px;font-size:13px;margin-top:6px}
+.sum div{display:flex;align-items:center;gap:8px}
+.dot{width:14px;height:14px;border-radius:50%;border:1px solid var(--line)}
+.row{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.btn.main{background:var(--accent);color:var(--bg);border-color:var(--accent);flex:1;padding:13px;font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,80px);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:12px;font-size:14px;transition:transform .3s}
+#toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header><div class="logo">Tumbler & Lunchbox</div><nav><span>Koleksi</span><span>Tentang</span></nav></header>
+<main>
+  <div class="stage" id="stage"><div class="tag" id="tag">Tumbler</div><div class="hint">Geser untuk memutar · scroll / cubit untuk zoom · klik tutup atau kunci untuk membuka</div></div>
+  <section class="panel">
+    <h1>Desain warnamu sendiri</h1>
+    <p class="sub">Pilih produk, pilih bagian, lalu pilih warna favoritmu.</p>
+    <div class="tabs" id="tabs"></div>
+    <div class="lbl">Bagian</div><div class="chips" id="parts"></div>
+    <div class="lbl">Palet Countryside</div><div class="sw" id="p1"></div>
+    <div class="lbl">Palet Cloud Skin</div><div class="sw" id="p2"></div>
+    <div class="nm" id="nm"></div>
+    <div class="lbl">Pilihanmu</div><div class="sum" id="sum"></div>
+    <div id="divbox" style="display:none"></div>
+    <div class="row"><button class="btn" id="open">Buka tutup</button><button class="btn" id="reset">Reset</button></div>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const P1=[["Soft Oat","#EBE5D7"],["Faded Peony","#F5DDE1"],["Sea Glass","#D3DFEB"],["Chamomile","#DCDBAE"],["Chestnut","#70604F"],["Storm","#808DA0"]];
+const P2=[["Silk Essence","#FFFBEA"],["Cherry Milk","#EEDAE6"],["Cocoa Root","#3A2B20"],["Matcha Glow","#F1F1C1"],["Cloud Skin","#C2E9FF"],["Morning Dew","#FFF9CF"]];
+const NAMES={};[...P1,...P2].forEach(([n,h])=>NAMES[h]=n);
+const $=id=>document.getElementById(id);
+const stage=$('stage');
+const R=new THREE.WebGLRenderer({antialias:true,alpha:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.appendChild(R.domElement);
+const S=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(35,1,.1,100);
+let dist=13;
+S.add(new THREE.HemisphereLight(0xffffff,0x8a7d6a,.85));
+const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(4,8,6);dl.castShadow=true;dl.shadow.mapSize.set(1024,1024);
+Object.assign(dl.shadow.camera,{left:-8,right:8,top:8,bottom:-8});S.add(dl);
+const fl=new THREE.DirectionalLight(0xffffff,.35);fl.position.set(-5,2,-4);S.add(fl);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.ShadowMaterial({opacity:.18}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;S.add(floor);
+
+const mat=(c,m=.1,r=.45)=>new THREE.MeshStandardMaterial({color:c,metalness:m,roughness:r});
+function add(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function rr(w,d,r){const s=new THREE.Shape(),x=-w/2,y=-d/2;s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+d-r);s.quadraticCurveTo(x+w,y+d,x+w-r,y+d);s.lineTo(x+r,y+d);s.quadraticCurveTo(x,y+d,x,y+d-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s}
+function ext(s,h,b=.03){const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:true,bevelSize:b,bevelThickness:b,bevelSegments:3,curveSegments:14});g.rotateX(-Math.PI/2);return g}
+
+/* ---------- Material (sama seperti prototype 3D) ---------- */
+const mm=(c,r,m,x={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:r,metalness:m},x));
+const HM={tumblerBody:mm(0x73aec9,.34,.32),navy:mm(0x16324f,.68,.05),cap:mm(0xb9d6e5,.38,.08),white:mm(0xf8fafc,.25,.05),straw:mm(0xdcebf2,.3,.05,{transparent:true,opacity:.92}),wire:mm(0xcbd5e1,.25,.85),beige:mm(0xd8c7b8,.45,.12),mauve:mm(0x6b4c4c,.52,.08),bumper:mm(0x3b2c2a,.75,.02),latch:mm(0x4a4a4e,.42,.25),inner:mm(0xe6dad0,.35,.05),divider:mm(0x8ab4c8,.55,.02),mag:mm(0xffffff,.25,.1,{emissive:0x555555,emissiveIntensity:.35}),magRing:mm(0x2f7fb8,.3,.2,{emissive:0x2f7fb8,emissiveIntensity:.5}),tray:mm(0x5b3b3b,.4,.05),cut:mm(0x7a5656,.35,.05)};
+const V=(x,y,z)=>z===undefined?new THREE.Vector2(x,y):new THREE.Vector3(x,y,z);
+const lathe=p=>new THREE.LatheGeometry(p.map(q=>V(q[0],q[1])),48);
+const ex=(s,d,bt,bs,seg=3)=>{const g=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:true,bevelThickness:bt,bevelSize:bs,bevelSegments:seg});g.rotateX(Math.PI/2);return g};
+const grp=(p,x,y,z)=>{const g=new THREE.Group();g.position.set(x,y,z);p.add(g);return g};
+
+/* ---------- Tumbler ---------- */
+const T=new THREE.Group(),L=new THREE.Group();
+add(lathe([[0,0],[1.06,0],[1.08,.08],[.98,.45],[.91,.88],[.87,.92],[0,.92]]),HM.navy,T);
+add(lathe([[.86,.88],[.86,3.65],[.83,3.85],[.75,4.02],[0,4.02]]),HM.tumblerBody,T);
+const col=grp(T,0,4.02,0);
+add(new THREE.CylinderGeometry(.82,.83,.56,48),HM.cap,col,0,.28,0);
+add(new THREE.CylinderGeometry(.835,.835,.24,48),HM.navy,col,0,.4,0);
+const lo=new THREE.CylinderGeometry(.21,.21,.14,32);lo.rotateX(Math.PI/2);lo.scale(.82,1.25,1);add(lo,HM.navy,col,0,.3,.8);
+const li=new THREE.CylinderGeometry(.14,.14,.16,32);li.rotateX(Math.PI/2);li.scale(.82,1.25,1);add(li,HM.white,col,0,.3,.81);
+add(new THREE.CylinderGeometry(.76,.76,.08,48),HM.cap,col,0,.56,0);
+const strawG=grp(col,0,.56,.12);
+const strawM=add(new THREE.CylinderGeometry(.11,.11,.55,24),HM.straw,strawG,0,.22,0);
+const tLid=grp(T,0,4.58,-.78);
+add(lathe([[.82,0],[.8,.14],[.68,.26],[0,.29]]),HM.cap,tLid,0,0,.78);
+add(lathe([[.64,.26],[.63,.33],[.5,.33],[.5,.26]]),HM.mag,tLid,0,0,.78);
+add(new THREE.CylinderGeometry(.5,.5,.03,48),HM.mag,tLid,0,.29,.78);
+const mr=new THREE.TorusGeometry(.5,.018,10,64);mr.rotateX(Math.PI/2);add(mr,HM.magRing,tLid,0,.305,.78);
+add(new THREE.CylinderGeometry(.74,.74,.16,36),HM.navy,tLid,0,.08,.78);
+const brush=grp(tLid,0,.04,.78);
+const stem=add(new THREE.CylinderGeometry(.018,.018,.78,12),HM.wire,brush,0,-.02,.05);stem.rotation.x=Math.PI/2;
+const bg=new THREE.CylinderGeometry(.008,.008,.24,6);
+for(let i=0;i<14;i++){const z=-.25+i*.032;[Math.PI/2,0].forEach(b=>{const m=new THREE.Mesh(bg,HM.white);m.rotation.z=b+i*.45;m.position.set(0,-.02,z);brush.add(m)})}
+const tHandle=grp(T,0,4.42,0);
+const ear=new THREE.CylinderGeometry(.14,.14,.14,24);ear.rotateZ(Math.PI/2);
+add(ear,HM.cap,tHandle,-.84,0,0);add(ear,HM.cap,tHandle,.84,0,0);
+add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-.85,0,0),V(-.86,.72,0),V(-.55,1.05,0),V(0,1.12,0),V(.55,1.05,0),V(.86,.72,0),V(.85,0,0)]),44,.085,16,false),HM.navy,tHandle);
+
+/* ---------- Lunchbox ---------- */
+const lbW=2.75,lbD=1.75,lbH=1.05,lbR=.32;
+const wl=rr(lbW,lbD,lbR);wl.holes.push(rr(lbW-.16,lbD-.16,lbR-.06));
+add(ex(wl,lbH,.05,.04,4),HM.beige,L,0,lbH+.05,0);
+add(ex(rr(lbW,lbD,lbR),.25,.05,.04,4),HM.beige,L,0,.3,0);
+const rimS=rr(lbW+.06,lbD+.06,lbR+.02);rimS.holes.push(rr(lbW-.16,lbD-.16,lbR-.06));
+add(ex(rimS,.14,.015,.015),HM.mauve,L,0,lbH+.12,0);
+add(new THREE.BoxGeometry(lbW-.2,.08,lbD-.2),HM.inner,L,0,.36,0);
+const miniG=grp(L,-.62,.4,-.18);
+const miniS=rr(.92,.92,.16);miniS.holes.push(rr(.8,.8,.11));
+add(ex(miniS,.56,.02,.015),HM.inner,miniG,0,.56,0);
+add(new THREE.BoxGeometry(.84,.06,.84),HM.inner,miniG,0,.04,0);
+[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b])=>add(new THREE.CylinderGeometry(.24,.25,.28,24),HM.bumper,L,a*(lbW/2-.14),.14,b*(lbD/2-.14)));
+const lbLid=grp(L,0,lbH+.13,-lbD/2);
+add(ex(rr(lbW+.08,lbD+.08,lbR+.03),.18,.02,.02,4),HM.mauve,lbLid,0,.18,lbD/2);
+add(ex(rr(lbW-.18,lbD-.18,lbR-.05),.05,.015,.015),HM.beige,lbLid,0,.21,lbD/2);
+add(ex(rr(lbW-.55,lbD-.5,.2),.03,.01,.01),HM.tray,lbLid,0,.245,lbD/2);
+const cutG=grp(lbLid,0,.268,lbD/2);
+const spB=new THREE.Shape();spB.absellipse(0,0,.3,.19,0,Math.PI*2,false,0);
+add(ex(spB,.04,.006,.006),HM.cut,cutG,-.6,0,-.25);
+add(ex(rr(1.35,.09,.04),.04,.006,.006),HM.cut,cutG,.3,0,-.25);
+add(ex(rr(.2,.3,.06),.04,.006,.006),HM.cut,cutG,-.72,0,.28);
+[-.1,-.033,.033,.1].forEach(dz=>add(ex(rr(.28,.035,.015),.04,.004,.004),HM.cut,cutG,-.95,0,.28+dz));
+add(ex(rr(1.6,.085,.04),.04,.006,.006),HM.cut,cutG,.15,0,.28);
+add(new THREE.BoxGeometry(.56,.34,.16),HM.latch,lbLid,0,.02,lbD+.06);
+add(new THREE.BoxGeometry(.42,.08,.18),HM.bumper,lbLid,0,.04,lbD+.06);
+
+/* ---------- Konfigurasi ---------- */
+const PROD={
+ tumbler:{label:"Tumbler",g:T,ly:2.7,d:13,parts:{body:["Badan",HM.tumblerBody],cap:["Tutup & kerah",HM.cap],accent:["Handle & dasar",HM.navy]}},
+ lunchbox:{label:"Lunchbox",g:L,ly:.9,d:8.5,parts:{body:["Badan",HM.beige],lid:["Bingkai & tutup",HM.mauve],inner:["Interior",HM.inner],accent:["Kaki sudut",HM.bumper],latch:["Kunci",HM.latch],divider:["Sekat silikon",HM.divider],tray:["Panel tutup",HM.tray],cut:["Sendok & garpu",HM.cut]}}
+};
+const DEF={};for(const k in PROD){DEF[k]={};for(const p in PROD[k].parts)DEF[k][p]='#'+PROD[k].parts[p][1].color.getHexString().toUpperCase()}
+S.add(T);S.add(L);
+
+/* ---------- Sekat silikon interaktif ---------- */
+const CELL=.5,X0=-1.25,Z0=-.75,NX=5,NZ=3,TOP=1.02;
+let divs=[],dSize=2,dOri='v',dTool='add';
+const divGroup=new THREE.Group();L.add(divGroup);
+const pick=new THREE.Mesh(new THREE.PlaneGeometry(2.5,1.5),new THREE.MeshBasicMaterial({visible:false}));pick.rotation.x=-Math.PI/2;pick.position.y=.41;L.add(pick);
+const ghost=new THREE.Mesh(new THREE.BufferGeometry(),mm(0xffffff,.5,0,{transparent:true,opacity:.5}));ghost.visible=false;L.add(ghost);
+const dgeo=n=>ex(rr(n*CELL-.02,.07,.03),.62,.012,.012);
+function snap(lx,lz,size,ori){
+ if(ori==='h'){const n=Math.min(size,NX),line=Math.abs(lz+.25)<Math.abs(lz-.25)?-.25:.25,st=Math.max(0,Math.min(NX-n,Math.round((lx-X0)/CELL-n/2)));return{ori,n,line,st}}
+ const n=Math.min(size,NZ),line=[-.75,-.25,.25,.75].reduce((a,b)=>Math.abs(b-lx)<Math.abs(a-lx)?b:a),st=Math.max(0,Math.min(NZ-n,Math.round((lz-Z0)/CELL-n/2)));return{ori,n,line,st}}
+function place(d,m){if(d.ori==='h'){m.position.set(X0+CELL*(d.st+d.n/2),TOP,d.line);m.rotation.y=0}else{m.position.set(d.line,TOP,Z0+CELL*(d.st+d.n/2));m.rotation.y=Math.PI/2}}
+const overlap=(a,b)=>a.ori===b.ori&&Math.abs(a.line-b.line)<.01&&a.st<b.st+b.n&&b.st<a.st+a.n;
+function addDiv(d){if(divs.some(o=>overlap(o,d)))return false;const m=new THREE.Mesh(dgeo(d.n),HM.divider);m.castShadow=m.receiveShadow=true;place(d,m);m.position.y=TOP+1;m.userData.d=d;d.mesh=m;divGroup.add(m);divs.push(d);return true}
+function delDiv(d){divGroup.remove(d.mesh);divs=divs.filter(o=>o!==d)}
+const LAYOUTS={"2 ruang":[{ori:'v',n:3,line:.25,st:0}],"3 ruang":[{ori:'v',n:3,line:-.25,st:0},{ori:'v',n:3,line:.75,st:0}],"4 ruang":[{ori:'v',n:3,line:.25,st:0},{ori:'h',n:3,line:-.25,st:0},{ori:'h',n:2,line:-.25,st:3}],"Bento":[{ori:'v',n:3,line:-.25,st:0},{ori:'h',n:3,line:.25,st:1},{ori:'v',n:1,line:.75,st:0}]};
+function setLayout(k,quiet){divs.slice().forEach(delDiv);(LAYOUTS[k]||[]).forEach(d=>addDiv({...d}));if(!quiet)openEdit()}
+const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+const hitAt=e=>{const r=R.domElement.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv,cam);L.updateMatrixWorld(true);return ray.intersectObjects([pick,...divGroup.children],false)};
+function msg(t){const x=$('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
+function hover(e){
+ if(cur!=='lunchbox'||dTool!=='add'||!isOpen||pts.size){ghost.visible=false;return}
+ const h=hitAt(e).find(x=>x.object===pick);if(!h){ghost.visible=false;return}
+ const p=L.worldToLocal(h.point.clone()),d=snap(p.x,p.z,dSize,dOri);
+ ghost.geometry.dispose();ghost.geometry=dgeo(d.n);place(d,ghost);ghost.material.color.set(divs.some(o=>overlap(o,d))?0xff6b6b:0xffffff);ghost.visible=true}
+function isLidHit(e){
+ const r=R.domElement.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv,cam);PROD[cur].g.updateMatrixWorld(true);
+ const h=ray.intersectObject(PROD[cur].g,true).find(x=>x.object!==pick&&x.object!==ghost);
+ if(!h)return false;
+ for(let o=h.object;o;o=o.parent){if(o===tLid||o===col||o===lbLid)return true}
+ return h.object.material===HM.latch}
+function clickStage(e){
+ if(isLidHit(e)){isOpen=!isOpen;if(isOpen&&cur==='lunchbox'){rotX=Math.max(rotX,.5);auto=false}ui();return}
+ if(cur!=='lunchbox')return;
+ if(!isOpen){openEdit();return}
+ const hs=hitAt(e);
+ if(dTool==='del'){const h=hs.find(x=>x.object.userData.d);if(h){delDiv(h.object.userData.d);ui()}return}
+ const h=hs.find(x=>x.object===pick);if(!h)return;
+ const p=L.worldToLocal(h.point.clone());
+ if(!addDiv(snap(p.x,p.z,dSize,dOri)))msg('Posisi itu sudah terisi sekat');ui()}
+function openEdit(){if(cur==='lunchbox'&&!isOpen){isOpen=true;rotX=Math.max(rotX,.75);auto=false}ui()}
+const setDS=n=>{dSize=n;openEdit()},setDO=o=>{dOri=o;openEdit()},setDT=t=>{dTool=t;openEdit()};
+let miniOn=true;
+const toggleMini=()=>{miniOn=!miniOn;miniG.visible=miniOn;ui()};
+let cutOn=true;const toggleCut=()=>{cutOn=!cutOn;cutG.visible=cutOn;ui()};
+function renderDiv(){
+ const c=(l,on,f)=>`<button class="chip${on?' on':''}" onclick="${f}">${l}</button>`;
+ $('divbox').innerHTML=`<div class="lbl">Sekat silikon · ${divs.length} terpasang</div>
+ <div class="chips">${[[1,'Kecil'],[2,'Sedang'],[3,'Besar']].map(([n,l])=>c(l+' ('+n*5+' cm)',dSize===n,'setDS('+n+')')).join('')}</div>
+ <div class="chips" style="margin-top:8px">${c('↕ Tegak',dOri==='v',"setDO('v')")}${c('↔ Datar',dOri==='h',"setDO('h')")}${c('＋ Tambah',dTool==='add',"setDT('add')")}${c('✕ Hapus',dTool==='del',"setDT('del')")}</div>
+ <div class="nm">${dTool==='add'?'Klik dasar lunchbox untuk memasang sekat.':'Klik sekat untuk melepasnya.'}</div>
+ <div class="lbl">Tata letak cepat</div>
+ <div class="chips">${Object.keys(LAYOUTS).map(k=>c(k,false,"setLayout('"+k+"')")).join('')}${c('Kosongkan',false,"setLayout('')")}${c('Wadah kecil: '+(miniOn?'ada':'lepas'),miniOn,'toggleMini()')}${c('Sendok-garpu: '+(cutOn?'ada':'lepas'),cutOn,'toggleCut()')}</div>`}
+setLayout('2 ruang',true);
+let cur='tumbler',part='body',isOpen=false,openT=0,rotY=-.5,rotX=.18,auto=true;
+
+function swatches(el,list){el.innerHTML='';list.forEach(([n,h])=>{const b=document.createElement('button');b.style.background=h;b.title=n;b.dataset.h=h;b.onclick=()=>{PROD[cur].parts[part][1].color.set(h);$('nm').textContent=PROD[cur].parts[part][0]+' → '+n;ui()};el.appendChild(b)})}
+function ui(){
+ const pr=PROD[cur];
+ $('tabs').innerHTML='';for(const k in PROD){const b=document.createElement('button');b.className='tab'+(k===cur?' on':'');b.textContent=PROD[k].label;b.onclick=()=>{cur=k;part=Object.keys(PROD[k].parts)[0];isOpen=false;dist=PROD[k].d;$('tag').textContent=PROD[k].label;ui()};$('tabs').appendChild(b)}
+ $('parts').innerHTML='';for(const p in pr.parts){const b=document.createElement('button');b.className='chip'+(p===part?' on':'');b.textContent=pr.parts[p][0];b.onclick=()=>{part=p;ui()};$('parts').appendChild(b)}
+ const hex='#'+pr.parts[part][1].color.getHexString().toUpperCase();
+ document.querySelectorAll('.sw button').forEach(b=>b.classList.toggle('on',b.dataset.h.toUpperCase()===hex));
+ $('sum').innerHTML='';for(const p in pr.parts){const h='#'+pr.parts[p][1].color.getHexString().toUpperCase();const d=document.createElement('div');d.innerHTML='<span class="dot" style="background:'+h+'"></span>'+pr.parts[p][0]+': <b>'+(NAMES[h]||h)+'</b> <span style="color:var(--mute)">'+h+'</span>';$('sum').appendChild(d)}
+ $('open').textContent=isOpen?'Tutup':'Buka tutup';
+ T.visible=cur==='tumbler';L.visible=cur==='lunchbox';$('divbox').style.display=cur==='lunchbox'?'block':'none';renderDiv();
+}
+swatches($('p1'),P1);swatches($('p2'),P2);
+$('open').onclick=()=>{isOpen=!isOpen;ui()};
+$('reset').onclick=()=>{for(const p in PROD[cur].parts)PROD[cur].parts[p][1].color.set(DEF[cur][p]);$('nm').textContent='';ui()};
+
+
+/* ---------- Interaksi ---------- */
+let dn=false,lx=0,ly=0,pts=new Map(),pd=0;
+stage.addEventListener('pointerdown',e=>{pts.set(e.pointerId,e);dn=true;auto=false;lx=e.clientX;ly=e.clientY;stage.setPointerCapture(e.pointerId)});
+stage.addEventListener('pointermove',e=>{
+ if(!pts.has(e.pointerId))return;pts.set(e.pointerId,e);
+ if(pts.size===2){const [a,b]=[...pts.values()];const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pd)dist=Math.min(18,Math.max(6,dist*pd/d));pd=d;return}
+ rotY+=(e.clientX-lx)*.01;rotX=Math.min(.9,Math.max(-.2,rotX+(e.clientY-ly)*.006));lx=e.clientX;ly=e.clientY});
+let sx=0,sy=0;stage.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});
+stage.addEventListener('pointermove',hover);stage.addEventListener('pointermove',e=>{if(!pts.size)stage.style.cursor=isLidHit(e)?'pointer':''});stage.addEventListener('pointerleave',()=>ghost.visible=false);
+const up=e=>{const one=pts.size===1;pts.delete(e.pointerId);pd=0;if(e.type==='pointerup'&&one&&Math.hypot(e.clientX-sx,e.clientY-sy)<6)clickStage(e)};stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);
+stage.addEventListener('wheel',e=>{e.preventDefault();dist=Math.min(18,Math.max(6,dist+e.deltaY*.01))},{passive:false});
+
+function size(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(size).observe(stage);size();
+
+function loop(){
+ requestAnimationFrame(loop);
+ if(auto)rotY+=.004;
+ openT+=((isOpen?1:0)-openT)*.1;
+ const pr=PROD[cur];pr.g.rotation.y=rotY;divGroup.children.forEach(m=>{m.position.y+=(TOP-m.position.y)*.18});
+ if(cur==='tumbler'){tLid.rotation.x=-Math.PI*.56*openT;tHandle.rotation.x=Math.PI*.52*openT;strawM.position.y=.05+.19*openT;strawM.scale.y=Math.max(.01,openT);strawM.visible=openT>.03;}
+ else{lbLid.rotation.x=-Math.PI*.55*openT;miniG.position.y=.4+.18*openT;}
+ cam.position.set(0,pr.ly+Math.sin(rotX)*dist*.9+.5,Math.cos(rotX)*dist);
+ cam.lookAt(0,pr.ly,0);
+ R.render(S,cam);
+}
+ui();loop();
+</script>
+</body>
+</html>
